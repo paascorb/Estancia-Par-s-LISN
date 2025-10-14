@@ -18,7 +18,7 @@ def main():
     )
 
     c=0
-    maxim = 10000
+    maxim = 100
     for elem in data:
         print(f"Fase {c} de {maxim}", end='\r')
         outputs = pipeline(
@@ -29,7 +29,7 @@ def main():
         if c > maxim:
             break
 
-    with open('Datasets/resultado_proposiciones', 'wb') as fp:
+    with open('Datasets/resultado_proposiciones.pkl', 'wb') as fp:
         pickle.dump(resultados, fp)
 
 def get_messages(texto):
