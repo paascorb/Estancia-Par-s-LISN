@@ -1,10 +1,12 @@
 import pickle
+import pandas as pd
 
 def main():
-    with open('Datasets/resultado_proposiciones.pkl', 'rb') as f:
-        resultado = pickle.load(f)
-    for elem in resultado:
-        print(elem)
+    df = pd.read_csv("Datasets/ResultadoProposiciones.csv")
+    # print(df.loc[0]["Respuesta"])
+    # print(df.head())
+    
+
 
 if __name__ == "__main__":
     main()
