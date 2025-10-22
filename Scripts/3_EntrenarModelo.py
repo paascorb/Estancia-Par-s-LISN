@@ -36,7 +36,7 @@ def main():
         model=modelo,
         args=SFTConfig(
             output_dir="Modelos/ProposicionadorES-LFM2-1.2B",
-            chat_template_path="LiquidAI/LFM2-1.2B-Extract",
+            chat_template_path="LiquidAI/LFM2-1.2B",
         ),
         train_dataset=load_from_disk("Datasets/ProposicionesES.hf"),
     )
@@ -133,8 +133,8 @@ def crear_dataset():
     aux = []
     numero_turn = []
     for index, row in df.iterrows():
-        aux.append([{"role": "user", "content": row.Respuesta},
-                    {"role": "assistant", "content": row.Instruccion}])
+        aux.append([{"role": "assistant", "content": row.Instruccion},
+                    {"role": "user", "content": row.Respuesta}])
         numero_turn.append(1)
     se = pd.Series(aux)
     df['messages'] = se.values

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Finetuning FLAN-T5 base pour extraire des propositions atomiques à
 partir de passages.
@@ -33,27 +32,26 @@ import seaborn as sns
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 class PropositionDataset(Dataset):
-     def __init__(self, data: List[Dict], tokenizer: AutoTokenizer,
-max_input_length: int = 512, max_target_length: int = 1024):
+
+    def __init__(self, data: List[Dict], tokenizer: AutoTokenizer, max_input_length: int = 512, max_target_length: int = 1024):
          self.data = data
          self.tokenizer = tokenizer
          self.max_input_length = max_input_length
          self.max_target_length = max_target_length
 
-     def __len__(self):
-         return len(self.data)
+    def __len__(self):
+        return len(self.data)
 
-     def __getitem__(self, idx):
-         item = self.data[idx]
+    def __getitem__(self, idx):
+        item = self.data[idx]
 
          # Format d'entrée: "Décomposez le passage suivant en propositions atomiques: {passage}"
-        input_text = f"Décomposez le passage suivant en propositions atomiques: {item['original_text']}"
-
-         # Format de sortie: propositions séparées par des retours à la ligne
-         target_text = "\n".join(item['propositions'])
+        input_text = f"Décomposez le passage suivant en propositions atomiques: {item['Texto']}"
+        # Format de sortie: propositions séparées par des retours à la ligne
+        target_text = "\n".join(item['Proposiciones'])
 
          # Tokenisation
-         input_encoding = self.tokenizer(
+        input_encoding = self.tokenizer(
              input_text,
              max_length=self.max_input_length,
              padding="max_length",
@@ -61,7 +59,7 @@ max_input_length: int = 512, max_target_length: int = 1024):
              return_tensors="pt"
          )
 
-         target_encoding = self.tokenizer(
+        target_encoding = self.tokenizer(
              target_text,
              max_length=self.max_target_length,
              padding="max_length",
@@ -70,13 +68,12 @@ max_input_length: int = 512, max_target_length: int = 1024):
          )
 
          # Pour T5, remplacer les pad tokens par -100 dans les labels
-         labels = target_encoding["input_ids"].flatten()
-         labels[labels == self.tokenizer.pad_token_id] = -100
+        labels = target_encoding["input_ids"].flatten()
+        labels[labels == self.tokenizer.pad_token_id] = -100
 
-         return {
+        return {
              "input_ids": input_encoding["input_ids"].flatten(),
-             "attention_mask":
-input_encoding["attention_mask"].flatten(),
+             "attention_mask": input_encoding["attention_mask"].flatten(),
              "labels": labels
          }
 
@@ -93,33 +90,27 @@ def load_dataset(file_path: str) -> List[Dict]:
          valid_data = []
          for i, item in enumerate(data):
              if not isinstance(item, dict):
-                 print(f"Attention: Item {i} n'est pas un dictionnaire,
-ignoré")
+                 print(f"Attention: Item {i} n'est pas un dictionnaire, ignoré")
                  continue
 
-             required_fields = ['original_text', 'propositions']
-             missing_fields = [field for field in required_fields if
-field not in item]
+             required_fields = ['Texto', 'Proposiciones']
+             missing_fields = [field for field in required_fields if field not in item]
 
              if missing_fields:
-                 print(f"Attention: Item {i} manque les champs
-{missing_fields}, ignoré")
+                 print(f"Attention: Item {i} manque les champs {missing_fields}, ignoré")
                  continue
 
-             if not item['original_text'].strip():
+             if not item['Texto'].strip():
                  print(f"Attention: Item {i} a un texte vide, ignoré")
                  continue
 
-             if not item['propositions'] or not
-isinstance(item['propositions'], list):
-                 print(f"Attention: Item {i} n'a pas de propositions
-valides, ignoré")
+             if not item['Proposiciones'] or not isinstance(item['Proposiciones'], list):
+                 print(f"Attention: Item {i} n'a pas de propositions valides, ignoré")
                  continue
 
              valid_data.append(item)
 
-         print(f"Dataset chargé: {len(valid_data)} exemples valides sur
-{len(data)} total")
+         print(f"Dataset chargé: {len(valid_data)} exemples valides sur {len(data)} total")
          return valid_data
 
      except FileNotFoundError:
@@ -129,8 +120,7 @@ valides, ignoré")
      except Exception as e:
          raise Exception(f"Erreur lors du chargement du dataset: {e}")
 
-def compute_f1_score(pred_propositions: List[str], true_propositions:
-List[str]) -> float:
+def compute_f1_score(pred_propositions: List[str], true_propositions: List[str]) -> float:
      """
      Calcule le score F1 entre deux ensembles de propositions.
      Basé sur l'approche BertScore mais simplifié pour les propositions.
@@ -138,8 +128,7 @@ List[str]) -> float:
      if not pred_propositions or not true_propositions:
          return 0.0
 
-     # Normalisation simple des propositions (minuscules, suppression
-espaces)
+     # Normalisation simple des propositions (minuscules, suppression espaces)
      pred_set = set(prop.lower().strip() for prop in pred_propositions)
      true_set = set(prop.lower().strip() for prop in true_propositions)
 
@@ -158,17 +147,14 @@ espaces)
      f1 = 2 * (precision * recall) / (precision + recall)
      return f1
 
-def evaluate_model(model, tokenizer, eval_dataloader, device,
-max_length=1024):
-     """Évalue le modèle sur l'ensemble de validation avec longueur de
-sortie étendue"""
+def evaluate_model(model, tokenizer, eval_dataloader, device, max_length=1024):
+     """Évalue le modèle sur l'ensemble de validation avec longueur de sortie étendue"""
      model.eval()
      total_f1 = 0
      num_examples = 0
 
      with torch.no_grad():
-         for batch in tqdm(eval_dataloader, desc="Évaluation",
-leave=False):
+         for batch in tqdm(eval_dataloader, desc="Évaluation", leave=False):
              input_ids = batch["input_ids"].to(device)
              attention_mask = batch["attention_mask"].to(device)
 
@@ -185,21 +171,16 @@ leave=False):
              )
 
              # Décodage des prédictions et des vraies valeurs
-             predictions = tokenizer.batch_decode(outputs,
-skip_special_tokens=True)
+             predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True)
              # Filtrer les tokens -100 des labels avant le décodage
              labels_filtered = batch["labels"].clone()
-             labels_filtered[labels_filtered == -100] =
-tokenizer.pad_token_id
-             targets = tokenizer.batch_decode(labels_filtered,
-skip_special_tokens=True)
+             labels_filtered[labels_filtered == -100] = tokenizer.pad_token_id
+             targets = tokenizer.batch_decode(labels_filtered, skip_special_tokens=True)
 
              # Calcul du F1 pour chaque exemple
              for pred, target in zip(predictions, targets):
-                 pred_props = [p.strip() for p in pred.split('\n') if
-p.strip()]
-                 true_props = [p.strip() for p in target.split('\n') if
-p.strip()]
+                 pred_props = [p.strip() for p in pred.split('\n') if p.strip()]
+                 true_props = [p.strip() for p in target.split('\n') if p.strip()]
 
                  f1 = compute_f1_score(pred_props, true_props)
                  total_f1 += f1
@@ -208,8 +189,7 @@ p.strip()]
      avg_f1 = total_f1 / num_examples if num_examples > 0 else 0
      return avg_f1
 
-def save_checkpoint(model, tokenizer, optimizer, scheduler, step, loss,
-output_dir):
+def save_checkpoint(model, tokenizer, optimizer, scheduler, step, loss, output_dir):
      """Sauvegarde un checkpoint du modèle"""
      checkpoint_dir = Path(output_dir) / f"checkpoint-{step}"
      checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -229,8 +209,7 @@ output_dir):
 
      print(f"Checkpoint sauvegardé: {checkpoint_dir}")
 
-def save_metrics_and_plots(train_losses, eval_f1s, eval_steps,
-output_dir):
+def save_metrics_and_plots(train_losses, eval_f1s, eval_steps, output_dir):
      """Sauvegarde les métriques et génère les courbes"""
      metrics_dir = Path(output_dir) / "metrics"
      metrics_dir.mkdir(parents=True, exist_ok=True)
@@ -254,19 +233,16 @@ output_dir):
          ax1.plot(steps, train_losses, 'b-', linewidth=2, alpha=0.8)
          ax1.set_xlabel('Itérations')
          ax1.set_ylabel('Loss d\'entraînement')
-         ax1.set_title('Évolution de la Loss d\'entraînement',
-fontsize=14, fontweight='bold')
+         ax1.set_title('Évolution de la Loss d\'entraînement', fontsize=14, fontweight='bold')
          ax1.grid(True, alpha=0.3)
          ax1.set_ylim(bottom=0)
 
      # Graphique 2: Score F1 de validation
      if eval_f1s and eval_steps:
-         ax2.plot(eval_steps, eval_f1s, 'r-o', linewidth=2, markersize=6,
-alpha=0.8)
+         ax2.plot(eval_steps, eval_f1s, 'r-o', linewidth=2, markersize=6, alpha=0.8)
          ax2.set_xlabel('Itérations')
          ax2.set_ylabel('Score F1 de validation')
-         ax2.set_title('Évolution du Score F1 de validation',
-fontsize=14, fontweight='bold')
+         ax2.set_title('Évolution du Score F1 de validation', fontsize=14, fontweight='bold')
          ax2.grid(True, alpha=0.3)
          ax2.set_ylim(0, 1)
 
@@ -276,10 +252,8 @@ fontsize=14, fontweight='bold')
                          xytext=(0,10), ha='center', fontsize=8)
 
      plt.tight_layout()
-     plt.savefig(metrics_dir / 'training_curves.png', dpi=300,
-bbox_inches='tight')
-     plt.savefig(metrics_dir / 'training_curves.pdf',
-bbox_inches='tight')
+     plt.savefig(metrics_dir / 'training_curves.png', dpi=300, bbox_inches='tight')
+     plt.savefig(metrics_dir / 'training_curves.pdf', bbox_inches='tight')
      plt.close()
 
      # Graphique séparé pour la loss avec plus de détails
@@ -289,41 +263,32 @@ bbox_inches='tight')
          plt.plot(steps, train_losses, 'b-', linewidth=1.5, alpha=0.8)
          plt.xlabel('Itérations')
          plt.ylabel('Loss d\'entraînement')
-         plt.title('Courbe de Loss détaillée', fontsize=14,
-fontweight='bold')
+         plt.title('Courbe de Loss détaillée', fontsize=14, fontweight='bold')
          plt.grid(True, alpha=0.3)
 
          # Moyenne mobile sur 100 points si suffisamment de données
          if len(train_losses) > 100:
              window_size = min(100, len(train_losses) // 10)
-             moving_avg = np.convolve(train_losses,
-np.ones(window_size)/window_size, mode='valid')
+             moving_avg = np.convolve(train_losses, np.ones(window_size)/window_size, mode='valid')
              moving_steps = steps[window_size-1:]
-             plt.plot(moving_steps, moving_avg, 'r-', linewidth=2,
-alpha=0.9,
+             plt.plot(moving_steps, moving_avg, 'r-', linewidth=2, alpha=0.9,
                      label=f'Moyenne mobile ({window_size} points)')
              plt.legend()
 
          plt.tight_layout()
-         plt.savefig(metrics_dir / 'loss_curve_detailed.png', dpi=300,
-bbox_inches='tight')
+         plt.savefig(metrics_dir / 'loss_curve_detailed.png', dpi=300, bbox_inches='tight')
          plt.close()
 
      print(f"Métriques et graphiques sauvegardés dans: {metrics_dir}")
 
 def main():
-     parser = argparse.ArgumentParser(description="Finetuner FLAN-T5 pour
-l'extraction de propositions")
-     parser.add_argument("--data_path", type=str,
-default="/people/pommeret/Documents/data/propositions_decomposees_temp_42000.json",
+     parser = argparse.ArgumentParser(description="Finetuner FLAN-T5 pour l'extraction de propositions")
+     parser.add_argument("--data_path", type=str, default="Datasets/Proposiciones_1.json",
                         help="Chemin vers le fichier de données")
-     parser.add_argument("--model_name", type=str,
-default="google/flan-t5-large",
+     parser.add_argument("--model_name", type=str, default="LiquidAI/LFM2-2.6B",
                         help="Nom du modèle pré-entraîné")
-     parser.add_argument("--output_dir", type=str,
-default="./propositionizer-flan-t5-large",
-                        help="Répertoire de sortie pour sauvegarder le
-modèle")
+     parser.add_argument("--output_dir", type=str, default="./Proposicionador-LFM2-2.6B",
+                        help="Répertoire de sortie pour sauvegarder le modèle")
      parser.add_argument("--batch_size", type=int, default=2,
                         help="Taille de batch (ajustez selon votre GPU)")
      parser.add_argument("--learning_rate", type=float, default=1e-4,
@@ -337,8 +302,7 @@ modèle")
      parser.add_argument("--max_input_length", type=int, default=512,
                         help="Longueur maximale des séquences d'entrée")
      parser.add_argument("--max_target_length", type=int, default=1024,
-                        help="Longueur maximale des séquences de sortie
-(étendue à 1024)")
+                        help="Longueur maximale des séquences de sortie (étendue à 1024)")
      parser.add_argument("--test_size", type=float, default=0.1,
                         help="Proportion des données pour la validation")
      parser.add_argument("--save_steps", type=int, default=2000,
@@ -350,15 +314,12 @@ modèle")
 
      # Configuration du device - MODIFIÉ POUR FORCER LE GPU 1
      print("Configuration des devices...")
-     print(f"CUDA_VISIBLE_DEVICES défini sur:
-{os.environ.get('CUDA_VISIBLE_DEVICES', 'non défini')}")
+     print(f"CUDA_VISIBLE_DEVICES défini sur: {os.environ.get('CUDA_VISIBLE_DEVICES', 'non défini')}")
 
      if torch.cuda.is_available():
-         device = torch.device("cuda:0")  # Sera mappé au GPU 1 physique
-grâce à CUDA_VISIBLE_DEVICES
+         device = torch.device("cuda:0")  # Sera mappé au GPU 1 physique grâce à CUDA_VISIBLE_DEVICES
          print(f"GPU disponible: {torch.cuda.get_device_name(0)}")
-         print(f"Mémoire GPU totale:
-{torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+         print(f"Mémoire GPU totale: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
          print(f"Utilisation du device: {device} (GPU 1 physique)")
      elif torch.backends.mps.is_available():
          device = torch.device("mps")
@@ -373,8 +334,7 @@ grâce à CUDA_VISIBLE_DEVICES
      print(f"Nombre total d'exemples: {len(data)}")
 
      # Division train/validation
-     train_data, val_data = train_test_split(data,
-test_size=args.test_size, random_state=42)
+     train_data, val_data = train_test_split(data, test_size=args.test_size, random_state=42)
      print(f"Données d'entraînement: {len(train_data)}")
      print(f"Données de validation: {len(val_data)}")
 
@@ -385,10 +345,8 @@ test_size=args.test_size, random_state=42)
 
      # Extension de la longueur de contexte pour le tokenizer
      tokenizer.model_max_length = 2048
-     print(f"Longueur de contexte du tokenizer étendue à:
-{tokenizer.model_max_length}")
-     print(f"Longueur maximale de sortie configurée à:
-{args.max_target_length}")
+     print(f"Longueur de contexte du tokenizer étendue à: {tokenizer.model_max_length}")
+     print(f"Longueur maximale de sortie configurée à: {args.max_target_length}")
 
      # Pour MPS, certaines opérations peuvent nécessiter float32
      if device.type == "mps":
@@ -397,26 +355,19 @@ test_size=args.test_size, random_state=42)
 
      # Vérification que le modèle est bien sur le bon GPU
      if torch.cuda.is_available():
-         print(f"Modèle chargé sur le device:
-{next(model.parameters()).device}")
-         print(f"Mémoire GPU utilisée après chargement:
-{torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+         print(f"Modèle chargé sur le device: {next(model.parameters()).device}")
+         print(f"Mémoire GPU utilisée après chargement: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
 
      # Création des datasets
-     train_dataset = PropositionDataset(train_data, tokenizer,
-args.max_input_length, args.max_target_length)
-     val_dataset = PropositionDataset(val_data, tokenizer,
-args.max_input_length, args.max_target_length)
+     train_dataset = PropositionDataset(train_data, tokenizer, args.max_input_length, args.max_target_length)
+     val_dataset = PropositionDataset(val_data, tokenizer, args.max_input_length, args.max_target_length)
 
      # Création des dataloaders
-     train_dataloader = DataLoader(train_dataset,
-batch_size=args.batch_size, shuffle=True)
-     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size,
-shuffle=False)
+     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
      # Configuration de l'optimiseur
-     optimizer = AdamW(model.parameters(), lr=args.learning_rate,
-weight_decay=args.weight_decay)
+     optimizer = AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
 
      # Calcul du nombre total d'étapes
      total_steps = len(train_dataloader) * args.num_epochs
@@ -446,8 +397,7 @@ weight_decay=args.weight_decay)
          print(f"\nÉpoque {epoch + 1}/{args.num_epochs}")
 
          epoch_losses = []
-         progress_bar = tqdm(train_dataloader, desc=f"Époque {epoch +
-1}")
+         progress_bar = tqdm(train_dataloader, desc=f"Époque {epoch + 1}")
 
          for batch in progress_bar:
              global_step += 1
@@ -457,8 +407,7 @@ weight_decay=args.weight_decay)
              attention_mask = batch["attention_mask"].to(device)
              labels = batch["labels"].to(device)
 
-             outputs = model(input_ids=input_ids,
-attention_mask=attention_mask, labels=labels)
+             outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
              loss = outputs.loss
 
              loss.backward()
@@ -473,15 +422,13 @@ attention_mask=attention_mask, labels=labels)
              progress_bar.set_postfix({
                  "loss": f"{current_loss:.4f}",
                  "step": global_step,
-                 "gpu_mem": f"{torch.cuda.memory_allocated() /
-1024**3:.1f}GB" if torch.cuda.is_available() else "N/A"
+                 "gpu_mem": f"{torch.cuda.memory_allocated() / 1024**3:.1f}GB" if torch.cuda.is_available() else "N/A"
              })
 
              # Évaluation périodique
              if global_step % args.eval_steps == 0:
                  print(f"\nÉvaluation à l'étape {global_step}...")
-                 val_f1 = evaluate_model(model, tokenizer,
-val_dataloader, device, args.max_target_length)
+                 val_f1 = evaluate_model(model, tokenizer, val_dataloader, device, args.max_target_length)
                  eval_f1s.append(val_f1)
                  eval_steps.append(global_step)
                  print(f"Score F1 de validation: {val_f1:.4f}")
@@ -490,17 +437,14 @@ val_dataloader, device, args.max_target_length)
              # Sauvegarde périodique
              if global_step % args.save_steps == 0:
                  save_checkpoint(model, tokenizer, optimizer, scheduler,
-                               global_step, current_loss,
-args.output_dir)
+                               global_step, current_loss, args.output_dir)
 
          avg_epoch_loss = np.mean(epoch_losses)
-         print(f"Perte moyenne de l'époque {epoch + 1}:
-{avg_epoch_loss:.4f}")
+         print(f"Perte moyenne de l'époque {epoch + 1}: {avg_epoch_loss:.4f}")
 
      # Évaluation finale
      print("\nÉvaluation finale...")
-     final_f1 = evaluate_model(model, tokenizer, val_dataloader, device,
-args.max_target_length)
+     final_f1 = evaluate_model(model, tokenizer, val_dataloader, device, args.max_target_length)
      eval_f1s.append(final_f1)
      eval_steps.append(global_step)
      print(f"Score F1 final: {final_f1:.4f}")
@@ -530,8 +474,7 @@ args.max_target_length)
          json.dump(config_data, f, indent=2)
 
      # Sauvegarde des métriques et génération des graphiques
-     save_metrics_and_plots(train_losses, eval_f1s, eval_steps,
-args.output_dir)
+     save_metrics_and_plots(train_losses, eval_f1s, eval_steps, args.output_dir)
 
      # Résumé final
      print("\n" + "="*60)
@@ -540,8 +483,7 @@ args.output_dir)
      print(f"GPU utilisé: {device}")
      if torch.cuda.is_available():
          print(f"Nom du GPU: {torch.cuda.get_device_name(0)}")
-         print(f"Mémoire finale utilisée: {torch.cuda.memory_allocated()
-/ 1024**3:.2f} GB")
+         print(f"Mémoire finale utilisée: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
      print(f"Nombre total d'étapes: {global_step}")
      print(f"Loss initiale: {train_losses[0]:.4f}")
      print(f"Loss finale: {train_losses[-1]:.4f}")
@@ -556,8 +498,7 @@ args.output_dir)
      print(f"Modèle sauvegardé dans: {args.output_dir}")
      print("="*60)
 
-     print("Entraînement terminé sur GPU 1 avec sortie étendue à 1024
-tokens!")
+     print("Entraînement terminé sur GPU 1 avec sortie étendue à 1024 tokens!")
 
 if __name__ == "__main__":
      main()
