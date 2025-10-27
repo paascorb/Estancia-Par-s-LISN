@@ -16,6 +16,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import (
      T5ForConditionalGeneration,
+     TFMT5ForConditionalGeneration,
      AutoTokenizer,
      get_linear_schedule_with_warmup
 )
@@ -29,7 +30,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # FORCER L'UTILISATION DU GPU 1
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 class PropositionDataset(Dataset):
 
@@ -283,11 +284,11 @@ def save_metrics_and_plots(train_losses, eval_f1s, eval_steps, output_dir):
 
 def main():
      parser = argparse.ArgumentParser(description="Finetuner FLAN-T5 pour l'extraction de propositions")
-     parser.add_argument("--data_path", type=str, default="Datasets/Proposiciones_1.json",
+     parser.add_argument("--data_path", type=str, default="Datasets/Proposiciones_2.json",
                         help="Chemin vers le fichier de données")
-     parser.add_argument("--model_name", type=str, default="LiquidAI/LFM2-2.6B",
+     parser.add_argument("--model_name", type=str, default="google/byt5-base",
                         help="Nom du modèle pré-entraîné")
-     parser.add_argument("--output_dir", type=str, default="./Proposicionador-LFM2-2.6B",
+     parser.add_argument("--output_dir", type=str, default="Modelos/ProposicionadorES-mT5-large",
                         help="Répertoire de sortie pour sauvegarder le modèle")
      parser.add_argument("--batch_size", type=int, default=2,
                         help="Taille de batch (ajustez selon votre GPU)")
@@ -341,7 +342,8 @@ def main():
      # Chargement du modèle et tokenizer
      print(f"Chargement du modèle {args.model_name}...")
      tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-     model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+     model = T5ForConditionalGeneration.from_pretrained(args.model_name) # T5
+    #  model = TFMT5ForConditionalGeneration.from_pretrained(args.model_name) # mT5
 
      # Extension de la longueur de contexte pour le tokenizer
      tokenizer.model_max_length = 2048

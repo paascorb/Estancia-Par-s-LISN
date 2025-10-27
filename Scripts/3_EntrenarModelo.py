@@ -1,93 +1,106 @@
-from huggingface_hub import login
+import json
 import pandas as pd
-import numpy as np
+import os
 import torch
-from datasets import Dataset, DatasetDict, load_dataset, load_from_disk
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer, 
-    BitsAndBytesConfig,
-    AutoTokenizer,
-)
-from peft import LoraConfig, get_peft_model
-from transformers import TrainingArguments
+import string
+from datasets import load_dataset, Dataset, load_from_disk
+from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer
 import warnings
 
 def main():
     warnings.filterwarnings("ignore")
     
-    modelo = "LiquidAI/LFM2-1.2B-Extract"
-    # # PRUEBA 1:
-    # # Cargamos el csv y creamos el dataset
-    dataset = crear_dataset()
-    # # Cargamos el modelo y la configuracion Lora
-    # model, tokenizer, peft_config = cargar_modelo(modelo)
-    # # Cargamos los parametros de entrenamiento
-    # params = parametros_entrenamiento("Modelos/")
-    # # Entrenamos el modelo
-    # trainer = entrenar_modelo(model, dataset, peft_config, tokenizer, params)
-    # # Guardamos el modelo
-    # model_to_save = trainer.model.module if hasattr(trainer.model, 'module') else trainer.model
-    # model_to_save.save_pretrained("ProposicionadorES-LFM2-1.2B")
+    modelo = "LiquidAI/LFM2-2.6B"
+    # # # PRUEBA 1:
+    # # # Cargamos el csv y creamos el dataset
+    # dataset = crear_dataset()
+    # # # Cargamos el modelo y la configuracion Lora
+    # # model, tokenizer, peft_config = cargar_modelo(modelo)
+    # # # Cargamos los parametros de entrenamiento
+    # # params = parametros_entrenamiento("Modelos/")
+    # # # Entrenamos el modelo
+    # # trainer = entrenar_modelo(model, dataset, peft_config, tokenizer, params)
+    # # # Guardamos el modelo
+    # # model_to_save = trainer.model.module if hasattr(trainer.model, 'module') else trainer.model
+    # # model_to_save.save_pretrained("ProposicionadorES-LFM2-1.2B")
 
-    # PRUEBA 2:
+    # # PRUEBA 2:
     trainer = SFTTrainer(
         model=modelo,
         args=SFTConfig(
-            output_dir="Modelos/ProposicionadorES-LFM2-1.2B",
-            chat_template_path="LiquidAI/LFM2-1.2B",
+            output_dir="Modelos/ProposicionadorES-LFM2-2.6B_2",
+            chat_template_path="LiquidAI/LFM2-2.6B",
         ),
-        train_dataset=load_from_disk("Datasets/ProposicionesES.hf"),
+        train_dataset=load_from_disk("Datasets/ProposicionesES_2.hf"),
     )
     trainer.train()
+    # modelo = "LiquidAI/LFM2-2.6B"
 
-def entrenar_modelo(model, dataset, peft_config, tokenizer, training_arguments):
+    # dataset = crear_dataset()
+    # dataset = load_from_disk("Datasets/ProposicionesES_2_1.hf")
+    # model, tokenizer, config = cargar_modelo(modelo)
+
+    # params = parametros_entrenamiento("Modelos/ProposicionadorES-LFM2-2.6B")
+    # trainer = entrenar_modelo(model, config, tokenizer, params, dataset)
+    # trainer.train()
+
+    # trainer.save_model('Modelos/ProposicionadorES-LFM2-2.6B')
+
+
+
+def entrenar_modelo(model, peft_config, tokenizer, training_arguments, dataset):
     trainer = SFTTrainer(
-        model=model,
-        train_dataset=dataset,
-        peft_config=peft_config,
-        formatting_func=formatear_dataset,
+        model=model.base_model.model, # the underlying Phi-3 model
+        peft_config=peft_config,  # added to fix issue in TRL>=0.20
+        processing_class=tokenizer,
         args=training_arguments,
+        train_dataset=dataset,
     )
 
-    for name, module in trainer.model.named_modules():
-        if "norm" in name:
-            module = module.to(torch.float32)
-    trainer.train()
     return trainer
 
 def parametros_entrenamiento(outputDir):
-    output_dir = outputDir
-    per_device_train_batch_size = 4
-    gradient_accumulation_steps = 10
-    optim = "paged_adamw_32bit"
-    save_steps = 200
-    logging_steps = 25
-    learning_rate = 2e-5
-    max_grad_norm = 0.3
-    max_steps = 300
-    warmup_ratio = 0.03
-    lr_scheduler_type = "cosine"
+    sft_config = SFTConfig(
+        ## GROUP 1: Memory usage
+        # These arguments will squeeze the most out of your GPU's RAM
+        # Checkpointing
+        gradient_checkpointing=True,    # this saves a LOT of memory
+        # Set this to avoid exceptions in newer versions of PyTorch
+        gradient_checkpointing_kwargs={'use_reentrant': False}, 
+        # Gradient Accumulation / Batch size
+        # Actual batch (for updating) is same (1x) as micro-batch size
+        gradient_accumulation_steps=1,  
+        # The initial (micro) batch size to start off with
+        per_device_train_batch_size=16, 
+        # If batch size would cause OOM, halves its size until it works
+        auto_find_batch_size=True,
 
-    return TrainingArguments(
-        output_dir=output_dir,
-        per_device_train_batch_size=per_device_train_batch_size,
-        gradient_accumulation_steps=gradient_accumulation_steps,
-        gradient_checkpointing=True,
-        optim=optim,
-        save_steps=save_steps,
-        logging_steps=logging_steps,
-        learning_rate=learning_rate,
-        fp16=True,
-        tf32=True,
-        max_grad_norm=max_grad_norm,
-        max_steps=max_steps,
-        warmup_ratio=warmup_ratio,
-        group_by_length=True,
-        lr_scheduler_type=lr_scheduler_type,
-        disable_tqdm=False
+        ## GROUP 2: Dataset-related
+        max_length=64, # renamed in v0.20
+        # Dataset
+        # packing a dataset means no padding is needed
+        packing=True,
+        packing_strategy='wrapped', # added to approximate original packing behavior
+
+        ## GROUP 3: These are typical training parameters
+        num_train_epochs=10,
+        learning_rate=3e-4,
+        # Optimizer
+        # 8-bit Adam optimizer - doesn't help much if you're using LoRA!
+        optim='paged_adamw_8bit',       
+        
+        ## GROUP 4: Logging parameters
+        logging_steps=10,
+        output_dir=outputDir,
+        report_to='none',
+
+        # ensures bf16 (the new default) is only used when it is actually available
+        bf16=torch.cuda.is_bf16_supported(including_emulation=False)
     )
+
+    return sft_config
 
 def cargar_modelo(Nombre):
     
@@ -95,58 +108,52 @@ def cargar_modelo(Nombre):
 
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True,
-        bnb_4bit_use_double_quant=True,
         bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_compute_dtype=torch.float32
     )
     
     model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        quantization_config=quantization_config,
-        use_cache=False,
-        device_map="auto",
-        trust_remote_code=True
+        model_name, quantization_config=quantization_config, device_map="auto",
     )
 
-    model.config.pretraining_tp = 1
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "right"
-
-    lora_alpha = 16
-    lora_dropout = 0.1
-    lora_r = 64
-    peft_config = LoraConfig(
-        lora_alpha=lora_alpha,
-        lora_dropout=lora_dropout,
-        r=lora_r,
-        bias="none",
+    model = prepare_model_for_kbit_training(model)
+    config = LoraConfig(
+        # the rank of the adapter, the lower the fewer parameters you'll need to train
+        r=8,                   
+        lora_alpha=16, # multiplier, usually 2*r
+        bias="none",           
+        lora_dropout=0.05,
         task_type="CAUSAL_LM",
-    )
-    return model, tokenizer, peft_config
+        # Newer models, such as Phi-3 at time of writing, may require 
+        # manually setting target modules
+        target_modules = [
+            "q_proj", "v_proj", "fc1", "fc2", "linear",
+            "gate_proj", "up_proj", "down_proj",
+        ]
+        )
+    model = get_peft_model(model, config)
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    return model, tokenizer, config
 
 
 def crear_dataset():
     # Aquí creamos el dataset desde el csv que hemos generado en los pasos anteriores
-    df = pd.read_csv("Datasets/ResultadoProposiciones.csv")
+    f = open('Datasets/Proposiciones_2.json')
+    data = json.load(f)
+    resultado = []
     custom_ds = pd.DataFrame()
-    aux = []
-    numero_turn = []
-    for index, row in df.iterrows():
-        aux.append([{"role": "assistant", "content": row.Instruccion},
-                    {"role": "user", "content": row.Respuesta}])
-        numero_turn.append(1)
-    se = pd.Series(aux)
-    df['messages'] = se.values
-    se = pd.Series(numero_turn)
-    df['num_turns'] = se.values
-    custom_ds["messages"] = df["messages"]
-    custom_ds["num_turns"] = df["num_turns"]
+    for elem in data:
+        resultado.append([{'role': 'user', 'content': elem["Instrucción"]},
+                        {'role': 'assistant', 'content': "\n".join(elem["Proposiciones"])}])
+    se = pd.Series(resultado)
+    custom_ds['messages'] = se.values
+    Dataset.from_pandas(custom_ds).save_to_disk("Datasets/ProposicionesES_2_1.hf")
 
-    Dataset.from_pandas(custom_ds).save_to_disk("Datasets/ProposicionesES.hf")
-
-def formatear_dataset(texto):
-    return f'{texto["Instruction"]}{texto["Output"]}'
+# def formatear_dataset(texto):
+#     return f'{texto["Instruction"]}{texto["Output"]}'
 
 
 if __name__ == "__main__":
