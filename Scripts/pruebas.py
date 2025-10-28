@@ -1,7 +1,7 @@
 import pickle
 import pandas as pd
 from transformers import pipeline
-from datasets import load_from_disk
+from datasets import load_from_disk, load_dataset
 from transformers import AutoTokenizer
 import json
 from transformers import T5ForConditionalGeneration
@@ -10,6 +10,25 @@ from transformers import MT5ForConditionalGeneration, T5Tokenizer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 def main():
+
+
+    dataset = load_from_disk("Datasets/ProposicionesES_2.hf")
+    dataset.push_to_hub("ProposicionesES")
+    # f = open('Datasets/wikipediaLimpiado.json')
+    # data = json.load(f)
+
+    # corpus = []
+    # for elem in data:
+    #     corpus.append(elem["Texto"])
+
+    # tokenizer = AutoTokenizer.from_pretrained("Modelos/ProposicionadorES-T5-large/checkpoint-12000")
+
+    # new_tokenizer = tokenizer.train_new_from_iterator(corpus, 52000)
+
+    # tokens = new_tokenizer.tokenize("Hace mucho frío en España.áúóé")
+    # print(tokens)
+
+    # new_tokenizer.save_pretrained("Modelos/ProposicionadorES-T5-large")
     
     # from transformers import file_utils
     # print(file_utils.default_cache_path)
@@ -26,18 +45,22 @@ def main():
     # print(response[0]["generated_text"])
     # last_checkpoint = "alfsnd/flan-t5-base-spanish-yoremnokki"
     # last_checkpoint = "Modelos/ProposicionadorES-T5-large/checkpoint-12000"
+    # last_checkpoint2 = "Modelos/ProposicionadorES-T5-large"
     # device = "cuda:1"
 
     # model = T5ForConditionalGeneration.from_pretrained(last_checkpoint)
     # model.to(device)
-    # model.push_to_hub("ProposicionadorES-T5-large")
-    # tokenizer = AutoTokenizer.from_pretrained(last_checkpoint)
-    # # tokenizer.add_tokens('í', 'Í')
-    # # model.resize_token_embeddings(len(tokenizer))
-    # # my_question = "Hace mucho fío en España."
+    # # model.push_to_hub("ProposicionadorES-mT5-large")
+    # tokenizer = AutoTokenizer.from_pretrained(last_checkpoint2)
+    # # tokenizer.add_tokens(['í', 'Í', 'ñ'], special_tokens=True)
+    # # special_tokens_dict = {'additional_special_tokens': ['í', 'Í', 'ñ']}
+    # # num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
+    # # print(tokenizer.all_special_tokens)
+    # model.resize_token_embeddings(len(tokenizer), mean_resizing=True)
+    # # my_question = "Hace mucho frío en España.áúóé"
     # my_question = """Las ballenas tienen un largo cráneo de hasta un tercio de la longitud total de su cuerpo, que en edad adulta mide de 15 a 17 m y pesa de 50 a 80 tn.[1]​ Poseen un estrecho y arqueado maxilar, lo que da a estos animales un perfil convexo. Esta forma permite la presencia de largas barbas, las cuales miden de 5 a 25 m de longitud. A diferencia de los peces, las ballenas tienen la cola dispuesta en un plano horizontal, lo que les facilita la ascensión a la superficie, donde tienen que subir a respirar, aunque pueden aguantar hasta una hora bajo el agua, además, duermen la mitad de su cerebro para no hundirse. Tienen dos espiráculos, orificios nasales, situados en la cima de la cabeza, por los que expulsan vapor de agua acompañado a menudo de mucosidades. La gestación dura unos doce meses y casi siempre tienen un único ballenato, que en el momento de nacer mide cinco metros y medio y pesa alrededor de 3000 kg, el cual alimentan con una leche especialmente nutritiva. Su esperanza de vida es de unos treinta años. Hacen grandes migraciones desde los mares fríos, donde se alimentan, a los cálidos, donde se aparean y reproducen. Son cosmopolitas y también se encuentran en el mar Mediterráneo.[5]​ """
     # inputs = tokenizer(my_question, return_tensors="pt").to(device)
-    # outputs = model.generate(**inputs, max_new_tokens=1024)
+    # outputs = model.generate(**inputs, max_new_tokens=4096)
     # answer = tokenizer.decode(outputs[0])
     
     # print(answer)

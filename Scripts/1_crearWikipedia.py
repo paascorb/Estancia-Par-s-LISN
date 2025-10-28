@@ -5,12 +5,17 @@ from threading import Thread
 
 def main():
     proletariado = 50
-    Proletario.cond_parada = 100000
+    Proletario.cond_parada = 20000 # Test
+    # Proletario.cond_parada = 100000 # Entrenamiento
     prole = [Proletario() for p in range(1, proletariado)]
     [w.start() for w in prole]
     [w.join() for w in prole]
 
-    with open('../Datasets/wikipedia.json', 'w') as fout:
+    # # Entrenamiento
+    # with open('Datasets/wikipedia.json', 'w') as fout:
+    #     json.dump(Proletario.lista , fout, ensure_ascii=False, indent=2)
+    # Test
+    with open('Datasets/wikipedia_val.json', 'w') as fout:
         json.dump(Proletario.lista , fout, ensure_ascii=False, indent=2)
 
 class Proletario(Thread):
