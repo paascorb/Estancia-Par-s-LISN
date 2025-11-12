@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # FORCER L'UTILISATION DU GPU 1
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 class PropositionDataset(Dataset):
 
@@ -191,25 +191,24 @@ def evaluate_model(model, tokenizer, eval_dataloader, device, max_length=1024):
      return avg_f1
 
 def save_checkpoint(model, tokenizer, optimizer, scheduler, step, loss, output_dir):
-     """Sauvegarde un checkpoint du modèle"""
-     if step in [6000, 12000]:
-        checkpoint_dir = Path(output_dir) / f"checkpoint-{step}"
-        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    """Sauvegarde un checkpoint du modèle"""
+    checkpoint_dir = Path(output_dir) / f"checkpoint-{step}"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
         # Sauvegarde du modèle et tokenizer
-        model.save_pretrained(checkpoint_dir)
-        tokenizer.save_pretrained(checkpoint_dir)
+    model.save_pretrained(checkpoint_dir)
+    tokenizer.save_pretrained(checkpoint_dir)
 
         # Sauvegarde des états de l'optimiseur et scheduler
-        checkpoint_data = {
+    checkpoint_data = {
             'step': step,
             'loss': loss,
             'optimizer_state_dict': optimizer.state_dict(),
             'scheduler_state_dict': scheduler.state_dict(),
         }
-        torch.save(checkpoint_data, checkpoint_dir / 'training_state.pt')
+    torch.save(checkpoint_data, checkpoint_dir / 'training_state.pt')
 
-        print(f"Checkpoint sauvegardé: {checkpoint_dir}")
+    print(f"Checkpoint sauvegardé: {checkpoint_dir}")
 
 def save_metrics_and_plots(train_losses, eval_f1s, eval_steps, output_dir):
      """Sauvegarde les métriques et génère les courbes"""
@@ -287,17 +286,17 @@ def main():
      parser = argparse.ArgumentParser(description="Finetuner FLAN-T5 pour l'extraction de propositions")
      parser.add_argument("--data_path", type=str, default="Datasets/Proposiciones_2.json",
                         help="Chemin vers le fichier de données")
-     parser.add_argument("--model_name", type=str, default="Modelos/ProposicionadorES-T5-large",
+     parser.add_argument("--model_name", type=str, default="Modelos/ProposicionadorES-T5-large/checkpoint-13500",
                         help="Nom du modèle pré-entraîné")
-     parser.add_argument("--output_dir", type=str, default="Modelos/ProposicionadorES-T5-large",
+     parser.add_argument("--output_dir", type=str, default="Modelos/ProposicionadorES2-T5-large",
                         help="Répertoire de sortie pour sauvegarder le modèle")
      parser.add_argument("--batch_size", type=int, default=2,
                         help="Taille de batch (ajustez selon votre GPU)")
-     parser.add_argument("--learning_rate", type=float, default=1e-4,
+     parser.add_argument("--learning_rate", type=float, default=1e-5,
                         help="Taux d'apprentissage")
      parser.add_argument("--num_epochs", type=int, default=3,
                         help="Nombre d'époques")
-     parser.add_argument("--weight_decay", type=float, default=1e-4,
+     parser.add_argument("--weight_decay", type=float, default=1e-1,
                         help="Decay des poids")
      parser.add_argument("--warmup_steps", type=int, default=500,
                         help="Nombre d'étapes de warmup")
@@ -307,7 +306,7 @@ def main():
                         help="Longueur maximale des séquences de sortie (étendue à 1024)")
      parser.add_argument("--test_size", type=float, default=0.1,
                         help="Proportion des données pour la validation")
-     parser.add_argument("--save_steps", type=int, default=2000,
+     parser.add_argument("--save_steps", type=int, default=2700,
                         help="Nombre d'étapes entre chaque sauvegarde")
      parser.add_argument("--eval_steps", type=int, default=15000,
                         help="Nombre d'étapes entre chaque évaluation")
@@ -344,6 +343,7 @@ def main():
      print(f"Chargement du modèle {args.model_name}...")
      tokenizer = AutoTokenizer.from_pretrained(args.model_name)
      model = T5ForConditionalGeneration.from_pretrained(args.model_name) # T5
+     model.resize_token_embeddings(len(tokenizer), mean_resizing=True) # Pruebas de tokenizador en español
     #  model = TFMT5ForConditionalGeneration.from_pretrained(args.model_name) # mT5
 
      # Extension de la longueur de contexte pour le tokenizer
