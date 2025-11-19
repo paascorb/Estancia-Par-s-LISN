@@ -5,7 +5,7 @@ import ast
 import numpy as np
 from pylate import indexes, models, retrieve
 
-def main():
+def main(url, modelo, destino, destino_rec):
 
     # Cargamos el modelo para comparar frases
     model = models.ColBERT(model_name_or_path="LiquidAI/LFM2-ColBERT-350M").to("cuda")
@@ -13,8 +13,7 @@ def main():
 
     # Cargamos los bancos de datos
     dataset = load_dataset("paascorb/ProposicionesValidacion_Gold-Standard")
-    """ Evaluamos el primer modelo: Gemma3 """
-    df_gemma3 = pd.read_csv("Datasets/evaluacion_proposiciones_gemma3.csv")
+    df = pd.read_csv(url)
 
     # Lista de los umbrales a evaluar
     umbrales = np.arange(0.05, 1, 0.05)
@@ -31,11 +30,13 @@ def main():
 
     # Evaluamos cada frase con las del gold-standard
     resultados = []
+    recalls = []
     cont = 0
     for umbral in umbrales:
         print(f"Fase {cont} de {len(umbrales)}", end='\r')
-        for index, row in df_gemma3.iterrows():
+        for index, row in df.iterrows():
             props = dataset["train"][index]["Proposiciones"]
+            aux = []
             for proposicion in ast.literal_eval(row.Proposiciones):
                 prop_emb = model.encode(
                     [proposicion],
@@ -47,11 +48,19 @@ def main():
                                         is_query=False
                                     ) 
                 res = [calcular_distancia(prop_emb, x) for x in embs]
-                valor = max(res) if max(res) >= umbral else 0
-                resultados.append({"Modelo": "Gemma3_27b", "ID": index, "Frase": proposicion, "Valor": valor, "Umbral": umbral.item()})
+                i_max = np.argmax(res)
+                maxi = res[i_max]
+                if maxi < umbral and props[i_max] in aux:
+                    maxi = 0
+                else:
+                    aux.append(props[i_max])
+                resultados.append({"Modelo": modelo, "ID": index, "Frase": proposicion, "Valor": maxi, "Umbral": umbral.item()})
+            recalls.append({"Modelo": modelo, "Texto": row.Texto, "Umbral": umbral.item(), "Seleccionados": aux, "Faltan": list(set(props) - set(aux))})
         cont += 1
-    df_val_gemma3 = pd.DataFrame(resultados)
-    df_val_gemma3.to_csv("Datasets/gemma3_27b_propVal_ColBERT.csv", index=False)
+    resu_df = pd.DataFrame(resultados)
+    recal_df = pd.DataFrame(recalls)
+    resu_df.to_csv(destino, index=False)
+    recal_df.to_csv(destino_rec, index=False)
 
 if __name__ == "__main__":
-    main()
+    main("Datasets/evaluacion_proposiciones_gemma3.csv", "Gemma3 27B", "Datasets/gemma3_27b_propVal_ColBERT.csv", "Datasets/gemma3_27b_propVal_ColBERT_recalls.csv")
