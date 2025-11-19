@@ -19,6 +19,16 @@ def main():
     # Lista de los umbrales a evaluar
     umbrales = np.arange(0.05, 1, 0.05)
 
+    # Metodo para calcular la distancia multivector
+    def calcular_distancia(a, b):
+        res = []
+        for elem in a:
+            aux = []
+            for comp in b:
+                aux.append(np.dot(elem, comp))
+            res.append(max(aux))
+        return sum(res)
+
     # Evaluamos cada frase con las del gold-standard
     resultados = []
     cont = 0
@@ -36,7 +46,7 @@ def main():
                                         batch_size=32,
                                         is_query=False
                                     ) 
-                res = [util.pytorch_cos_sim(prop_emb, x).mean().item() for x in embs]
+                res = [calcular_distancia(prop_emb, x) for x in embs]
                 valor = max(res) if max(res) >= umbral else 0
                 resultados.append({"Modelo": "Gemma3_27b", "ID": index, "Frase": proposicion, "Valor": valor, "Umbral": umbral.item()})
         cont += 1
