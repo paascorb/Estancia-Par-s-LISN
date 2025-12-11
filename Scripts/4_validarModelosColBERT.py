@@ -160,7 +160,7 @@ def main(url, modelo, destino, destino_rec):
                         [proposicion])[0]
                 for prop in props:
                     emb = model.encode(prop) 
-                    res = calcular_distancia(prop_emb, x)
+                    res = calcular_distancia(prop_emb, emb)
                     if res > maxi:
                         maxi = res
                         prop_select = prop
